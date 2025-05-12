@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import '../styles/globals.css';
 import { SessionProvider } from "next-auth/react";
+import { TimeSlotProvider } from '@/context/TimeSlotContext';
 
 const intenseDarkTheme = createTheme({
   palette: {
@@ -79,8 +80,10 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
       </Head>
       <ThemeProvider theme={intenseDarkTheme}>
         <SessionProvider session={session}>
+          <TimeSlotProvider>
         <CssBaseline />
         <Component {...pageProps} />
+        </TimeSlotProvider>
         </SessionProvider>
       </ThemeProvider>
     </>

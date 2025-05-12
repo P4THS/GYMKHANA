@@ -64,13 +64,13 @@ export default function Footer() {
             Connect With Us
           </Typography>
           <Box>
-            <IconButton href="#" sx={{ color: '#ff9f1c' }}>
+            <IconButton href="https://www.instagram.com/isprofficial1/?hl=en" sx={{ color: '#ff9f1c' }}>
               <InstagramIcon />
             </IconButton>
-            <IconButton href="#" sx={{ color: '#ff9f1c' }}>
+            <IconButton href="https://www.facebook.com/OfficialDGISPR/" sx={{ color: '#ff9f1c' }}>
               <FacebookIcon />
             </IconButton>
-            <IconButton href="#" sx={{ color: '#ff9f1c' }}>
+            <IconButton href="https://x.com/OfficialDGISPR" sx={{ color: '#ff9f1c' }}>
               <XIcon />
             </IconButton>
           </Box>

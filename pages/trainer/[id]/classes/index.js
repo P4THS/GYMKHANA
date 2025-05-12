@@ -81,7 +81,7 @@ export default function TrainerClassesPage({ classes, error }) {
                         key={c._id}
                         hover
                         sx={{ cursor: 'pointer' }}
-                        onClick={() => router.push(`/trainer/${id}/classes/${c._id}`)}
+                        onClick={() => router.push(`/trainer/classes/${c._id}`)}
                       >
                         <TableCell>{c.className || 'Unnamed'}</TableCell>
                         <TableCell>{c.classType}</TableCell>

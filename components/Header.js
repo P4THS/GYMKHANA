@@ -34,8 +34,7 @@ export default function Header() {
     ];
   } else if (isTrainer) {
     links = [
-      { label: 'Dashboard',  href: '/dashboard'  },
-      { label: 'My Classes', href: '/my-classes' },
+      { label: 'Dashboard',  href: '/dashboard'  }
     ];
   }
 

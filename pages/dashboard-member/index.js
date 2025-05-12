@@ -7,8 +7,6 @@ import {
   Typography,
   Button,
   Paper,
-  Card,
-  CardContent,
   List,
   ListItem,
   ListItemText,
@@ -17,11 +15,13 @@ import {
 } from "@mui/material";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { useTimeSlot } from "@/context/TimeSlotContext";
 
 export default function ProfileDetailPage() {
   const navigation = useRouter();
-  const { data: authData } = useSession();
+  const { data: authData, status } = useSession();
   const memberIdentifier = authData?.user?.id;
+  const { setTimeSlotUsage } = useTimeSlot();
 
   const [memberData, setMemberData] = useState(null);
   const [storageReservation, setStorageReservation] = useState(null);
@@ -39,7 +39,7 @@ export default function ProfileDetailPage() {
   };
 
   useEffect(() => {
-    if (!memberIdentifier || !authData) return;
+    if (!memberIdentifier || status === "loading") return;
     const currentUserId = authData.user?.id;
     const isAuthorized = currentUserId === memberIdentifier;
 
@@ -53,20 +53,32 @@ export default function ProfileDetailPage() {
       try {
         setIsDataFetching(true);
 
+        // Fetch member info
         const memberResponse = await fetch(`/api/users?userId=${memberIdentifier}`);
         if (!memberResponse.ok) throw new Error("Failed to retrieve member information");
         const memberInfo = await memberResponse.json();
         setMemberData(memberInfo.user);
 
+        // Fetch storage reservation
         const reservationResponse = await fetch(`/api/assignments?userId=${memberIdentifier}`);
         if (!reservationResponse.ok) throw new Error("Failed to retrieve storage reservation information");
         const reservationInfo = await reservationResponse.json();
         setStorageReservation(reservationInfo.assignment);
 
+        // Fetch class enrollments
         const classesResponse = await fetch(`/api/class-enrollments?userId=${memberIdentifier}`);
         if (!classesResponse.ok) throw new Error("Failed to retrieve class enrollment information");
         const classesInfo = await classesResponse.json();
-        setEnrolledClasses(classesInfo.enrollments || []);
+        const enrolls = classesInfo.enrollments || [];
+        setEnrolledClasses(enrolls);
+
+        // Update global time slot usage context
+        const usage = Array.from({ length: 24 }, () => null);
+        enrolls.forEach(en => {
+          const hour = new Date(en.schedule).getHours();
+          usage[hour] = memberIdentifier;
+        });
+        setTimeSlotUsage(usage);
       } catch (err) {
         setFetchError(err.message);
         console.error("Error retrieving profile data:", err);
@@ -76,7 +88,7 @@ export default function ProfileDetailPage() {
     };
 
     retrieveProfileData();
-  }, [memberIdentifier, authData]);
+  }, [memberIdentifier, status, setTimeSlotUsage]);
 
   const handleCancelReservation = async () => {
     try {
@@ -109,6 +121,18 @@ export default function ProfileDetailPage() {
       });
 
       if (!response.ok) throw new Error("Failed to unenroll from class");
+      const cls = enrolledClasses.find(c => c.classId === classId);
+      const hour = new Date(cls.schedule).getHours();
+
+      // clear the slot
+      setTimeSlotUsage(prev => {
+        const next = [...prev];
+        next[hour] = null;
+        return next;
+      });
+
+      // then trigger your reload
+
       navigation.reload();
     } catch (err) {
       console.error("Error unenrolling from class:", err);
@@ -116,7 +140,7 @@ export default function ProfileDetailPage() {
     }
   };
 
-  if (isDataFetching)
+  if (isDataFetching || status === "loading")
     return (
       <Box
         sx={{
@@ -133,6 +157,7 @@ export default function ProfileDetailPage() {
   if (accessDenied) return <Alert severity="error" sx={{ mt: 4 }}>Access denied. You don't have permission to view this profile.</Alert>;
   if (fetchError) return <Alert severity="error" sx={{ mt: 4 }}>Error: {fetchError}</Alert>;
   if (!memberData) return <Typography align="center" mt={4}>Member profile not found</Typography>;
+
 
   return (
     <>
@@ -189,6 +214,7 @@ export default function ProfileDetailPage() {
             {enrolledClasses.length > 0 ? (
               <List>
                 {enrolledClasses.map((enrollment) => (
+                  
                   <ListItem
                     key={enrollment.enrollmentId}
                     disableGutters
@@ -202,6 +228,7 @@ export default function ProfileDetailPage() {
                       borderRadius: 2,
                     }}
                   >
+                    <Link href={"/trainer/classes/"+enrollment.classId}>
                     <ListItemText
                         primary={
                             <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#fff" }}>
@@ -222,6 +249,7 @@ export default function ProfileDetailPage() {
                             </>
                         }
                         />
+                        </Link>
                     <Button
                       variant="outlined"
                       color="error"

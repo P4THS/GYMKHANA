@@ -15,8 +15,10 @@ import {
 } from "@mui/material";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { useTimeSlot } from '@/context/TimeSlotContext';
 
 export default function ClassesPage({ initialClasses, initialEnrollments }) {
+  const { setTimeSlotUsage } = useTimeSlot();
   const router = useRouter();
   const { data: authData, status: authStatus } = useSession();
   const isPending = authStatus === "loading";
@@ -30,18 +32,82 @@ export default function ClassesPage({ initialClasses, initialEnrollments }) {
     enrolledClasses.some((enrollment) => enrollment.classId === classId);
 
   const handleEnroll = async (classId) => {
-    if (!isUserLoggedIn) {
-      alert("Please log in to enroll in classes");
-      router.push("login");
-      return;
+  if (!isUserLoggedIn) {
+    alert("Please log in to enroll in classes");
+    router.push("/login");
+    return;
+  }
+
+  // figure out the hour of the class they want
+  const cls = classes.find((c) => c._id === classId);
+  const hour = new Date(cls.schedule).getHours();
+
+  // if that hour is already occupied, bail out
+  let canEnroll = true;
+  setTimeSlotUsage((prev) => {
+    if (prev[hour]) {
+      canEnroll = false;
+      return prev;
     }
-    router.push(router.asPath); // revalidate via SSR
-  };
+    const next = [...prev];
+    next[hour] = userId; 
+    return next;
+  });
+
+  if (!canEnroll) {
+    alert("You already have a class at that time slot!");
+    return;
+  }
+
+  // go talk to your API
+  try {
+    const res = await fetch("/api/class-enrollments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, classId }),
+    });
+    if (!res.ok) throw new Error("Failed to enroll");
+    // optionally pull down the new enrollments list, or just reload
+    router.reload()
+    router.replace(router.asPath);
+  } catch (err) {
+    // rollback your optimistic context update
+    setTimeSlotUsage((prev) => {
+      const next = [...prev];
+      next[hour] = null;
+      return next;
+    });
+    console.error(err);
+    alert("Enrollment failed. Please try again.");
+  }
+};
 
   const handleUnenroll = async (classId) => {
-    alert('Please use dashboard to unenroll');
-    router.push(router.asPath);
-  };
+  try {
+    const res = await fetch("/api/class-enrollments", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, classId }),
+    });
+    if (!res.ok) throw new Error("Failed to unenroll");
+
+    // clear our context slot
+    const cls = classes.find((c) => c._id === classId);
+    const hour = new Date(cls.schedule).getHours();
+    setTimeSlotUsage((prev) => {
+      const next = [...prev];
+      next[hour] = null;
+      return next;
+    });
+
+    // reload data
+    router.reload()
+    router.replace(router.asPath);
+  } catch (err) {
+    console.error(err);
+    alert("Could not cancel enrollment. Try again.");
+  }
+};
 
   if (isPending)
     return (
@@ -98,6 +164,7 @@ export default function ClassesPage({ initialClasses, initialEnrollments }) {
                   const enrolled = isUserEnrolled(classItem._id);
                   const isFull = classItem.availableSpots <= 0;
                   return (
+                    
                     <ListItem
                       key={classItem._id}
                       disableGutters
@@ -111,6 +178,7 @@ export default function ClassesPage({ initialClasses, initialEnrollments }) {
                         borderRadius: 2,
                       }}
                     >
+                      <Link href={"/trainer/classes/"+classItem._id}>
                       <ListItemText
                         primary={
                           <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#fff" }}>
@@ -131,6 +199,7 @@ export default function ClassesPage({ initialClasses, initialEnrollments }) {
                           </>
                         }
                       />
+                      </Link>
                       {isFull ? (
                         <Button variant="contained" color="secondary" disabled>
                           Class Full
@@ -145,6 +214,7 @@ export default function ClassesPage({ initialClasses, initialEnrollments }) {
                         </Button>
                       )}
                     </ListItem>
+
                   );
                 })
               )}
