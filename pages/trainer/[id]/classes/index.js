@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useRouter } from 'next/router';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -12,44 +12,16 @@ import {
   TableRow,
   TableCell,
   TableBody,
-  CircularProgress,
-  Alert,
   Button,
+  Alert,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { MongoClient, ObjectId } from 'mongodb';
 
-export default function TrainerClassesPage() {
+export default function TrainerClassesPage({ classes, error }) {
   const router = useRouter();
   const { id } = router.query;
-  const [classes, setClasses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (!id) return;
-    const fetchClasses = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/classes?trainerId=${id}`);
-        if (!res.ok) throw new Error('Failed to fetch classes');
-        const { classes } = await res.json();
-        setClasses(classes);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchClasses();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <CircularProgress color="secondary" />
-      </Box>
-    );
-  }
   if (error) {
     return <Alert severity="error">Error: {error}</Alert>;
   }
@@ -57,13 +29,33 @@ export default function TrainerClassesPage() {
   return (
     <>
       <Header />
-      <Box sx={{ position: 'relative', minHeight: '100vh', backgroundImage: 'url("/images/dashboard.png")', backgroundSize: 'cover', backgroundPosition: 'center', pt: 4, mt: '-70px' }}>
+      <Box
+        sx={{
+          position: 'relative',
+          minHeight: '100vh',
+          backgroundImage: 'url("/images/dashboard.png")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          pt: 4,
+          mt: '-70px',
+        }}
+      >
         <Box sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,0.6)' }} />
-        <Box sx={{ position: 'relative', maxWidth: 800, mx: 'auto', p: 3, color: 'text.primary', mt: '70px' }}>
-          <Button startIcon={<ArrowBackIcon />} onClick={() => router.back()} sx={{ mb: 2, color: '#fff' }}>
+        <Box
+          sx={{ position: 'relative', maxWidth: 800, mx: 'auto', p: 3, color: 'text.primary', mt: '70px' }}
+        >
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => router.back()}
+            sx={{ mb: 2, color: '#fff' }}
+          >
             Back to Trainers
           </Button>
-          <Typography variant="h4" gutterBottom sx={{ color: 'secondary.main', textAlign: 'center', mb: 3 }}>
+          <Typography
+            variant="h4"
+            gutterBottom
+            sx={{ color: 'secondary.main', textAlign: 'center', mb: 3 }}
+          >
             Classes Offered
           </Typography>
 
@@ -85,10 +77,17 @@ export default function TrainerClassesPage() {
                     const end = new Date(start);
                     end.setHours(start.getHours() + 1);
                     return (
-                      <TableRow key={c._id} hover sx={{ cursor: 'pointer' }} onClick={() => router.push(`/trainer/classes/${c._id}`)}>
+                      <TableRow
+                        key={c._id}
+                        hover
+                        sx={{ cursor: 'pointer' }}
+                        onClick={() => router.push(`/trainer/${id}/classes/${c._id}`)}
+                      >
                         <TableCell>{c.className || 'Unnamed'}</TableCell>
                         <TableCell>{c.classType}</TableCell>
-                        <TableCell>{start.toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })} - {end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                        <TableCell>
+                          {start.toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })} - {end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </TableCell>
                         <TableCell>{c.maxCapacity}</TableCell>
                         <TableCell>
                           <Button size="small" variant="outlined">Details</Button>
@@ -100,11 +99,38 @@ export default function TrainerClassesPage() {
               </Table>
             </TableContainer>
           ) : (
-            <Typography align="center" color="text.secondary">No classes found for this trainer.</Typography>
+            <Typography align="center" color="text.secondary">
+              No classes found for this trainer.
+            </Typography>
           )}
         </Box>
       </Box>
       <Footer />
     </>
   );
+}
+
+export async function getServerSideProps(context) {
+  const { id } = context.params;
+  try {
+    const client = await MongoClient.connect("mongodb+srv://talmaj2173:rXDInYAS0pKckoPH@c.q8asa.mongodb.net/?retryWrites=true&w=majority&appName=c");
+    const db = client.db("gym_db");
+    const classesData = await db
+      .collection('classes')
+      .find({ trainerId: new ObjectId(id) })
+      .toArray();
+    client.close();
+
+    const classes = classesData.map((c) => ({
+      _id: c._id.toString(),
+      className: c.className,
+      classType: c.classType,
+      schedule: c.schedule,
+      maxCapacity: c.maxCapacity,
+    }));
+
+    return { props: { classes } };
+  } catch (err) {
+    return { props: { classes: [], error: err.message } };
+  }
 }

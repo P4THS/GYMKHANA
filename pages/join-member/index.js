@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { Box, Container } from "@mui/material";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import RegisterCard from "@/components/RegisterCard";
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
+import RegisterCard from '@/components/RegisterCard';
 
 export default function JoinMember() {
   const router = useRouter();
@@ -99,4 +99,9 @@ export default function JoinMember() {
       <Footer />
     </>
   );
+}
+
+// Pre-render page at build time since no dynamic data needed
+export async function getStaticProps() {
+  return { props: {} };
 }

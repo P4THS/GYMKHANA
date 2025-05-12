@@ -64,57 +64,43 @@ const LockerGrid = styled(Box)({
   width: '100%',
 });
 
-export default function StorageManagementPage() {
-  const navigator = useRouter();
-  const { data: authData, status: authStatus } = useSession();
-  const [storageUnits, setStorageUnits] = useState([]);
-  const [isDataFetching, setIsDataFetching] = useState(true);
-  const [fetchError, setFetchError] = useState(null);
+export default function StorageManagementPage({ storageUnits, fetchError }) {
+  const router = useRouter();
+  const { data: session, status: authStatus } = useSession();
+  const [isDataFetching, setIsDataFetching] = useState(false);
   const [memberReservation, setMemberReservation] = useState(null);
-
+  
   const isPending = authStatus === "loading";
   const isUserLoggedIn = authStatus === "authenticated";
-  const memberIdentifier = authData?.user?.id;
+  const memberIdentifier = session?.user?.id;
 
   useEffect(() => {
-    const retrieveStorageData = async () => {
-      if (isPending) return;
-
+    const retrieveReservation = async () => {
+      if (isPending || !isUserLoggedIn || !memberIdentifier) return;
       try {
         setIsDataFetching(true);
-
-        const unitsResponse = await fetch("/api/lockers");
-        if (!unitsResponse.ok) {
-          throw new Error("Failed to fetch storage units");
+        const reservationResponse = await fetch(
+          `/api/assignments?userId=${memberIdentifier}`
+        );
+        if (!reservationResponse.ok) {
+          throw new Error("Failed to fetch reservation data");
         }
-
-        const unitsData = await unitsResponse.json();
-        setStorageUnits(unitsData.lockers || []);
-
-        if (isUserLoggedIn && memberIdentifier) {
-          const reservationResponse = await fetch(`/api/assignments?userId=${memberIdentifier}`);
-          if (!reservationResponse.ok) {
-            throw new Error("Failed to fetch reservation data");
-          }
-
-          const reservationData = await reservationResponse.json();
-          setMemberReservation(reservationData.assignment);
-        }
+        const reservationData = await reservationResponse.json();
+        setMemberReservation(reservationData.assignment);
       } catch (err) {
-        setFetchError(err.message);
-        console.error("Error retrieving data:", err);
+        console.error("Error retrieving reservation:", err);
       } finally {
         setIsDataFetching(false);
       }
     };
 
-    retrieveStorageData();
+    retrieveReservation();
   }, [memberIdentifier, authStatus, isUserLoggedIn, isPending]);
 
   const handleReserveUnit = async (unitId) => {
     if (!isUserLoggedIn) {
       alert("Please log in to reserve a storage unit");
-      navigator.push("/auth/signin");
+      router.push("/auth/signin");
       return;
     }
 
@@ -134,7 +120,7 @@ export default function StorageManagementPage() {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to reserve storage unit");
       }
-      navigator.reload();
+      router.reload();
     } catch (err) {
       console.error("Error reserving storage unit:", err);
       alert(err.message || "Failed to reserve storage unit. Please try again.");
@@ -157,8 +143,7 @@ export default function StorageManagementPage() {
       if (!response.ok) {
         throw new Error("Failed to cancel reservation");
       }
-
-      navigator.reload();
+      router.reload();
     } catch (err) {
       console.error("Error cancelling reservation:", err);
       alert("Failed to cancel reservation. Please try again.");
@@ -358,4 +343,32 @@ export default function StorageManagementPage() {
       <Footer />
     </>
   );
+}
+
+export async function getServerSideProps(context) {
+  const { req } = context;
+  let storageUnits = [];
+  let fetchError = null;
+
+  const protocol = req.headers.host.includes("localhost") ? "http" : "https";
+  const baseUrl = `${protocol}://${req.headers.host}`;
+
+  try {
+    const unitsResponse = await fetch(`${baseUrl}/api/lockers`);
+    if (!unitsResponse.ok) {
+      throw new Error("Failed to fetch storage units");
+    }
+    const unitsData = await unitsResponse.json();
+    storageUnits = unitsData.lockers || [];
+  } catch (err) {
+    console.error("Error in getServerSideProps:", err);
+    fetchError = err.message;
+  }
+
+  return {
+    props: {
+      storageUnits,
+      fetchError,
+    },
+  };
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -9,54 +9,15 @@ import {
   Card,
   CardContent,
   Button,
-  CircularProgress,
-  Alert,
   Avatar,
   Chip,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import ClassIcon from '@mui/icons-material/Class';
 
-export default function TrainersPage() {
-  const [trainers, setTrainers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    async function fetchTrainers() {
-      try {
-        setLoading(true);
-        const res = await fetch('/api/trainers');
-        if (!res.ok) throw new Error('Failed to fetch trainers');
-        const { trainers } = await res.json();
-
-        const enriched = await Promise.all(
-          trainers.map(async (t) => {
-            const cRes = await fetch(`/api/classes?trainerId=${t._id}`);
-            const { classes } = cRes.ok ? await cRes.json() : { classes: [] };
-            const types = Array.from(new Set(classes.map((c) => c.classType))).map(
-              (type) => type.charAt(0).toUpperCase() + type.slice(1)
-            );
-            return { ...t, classCount: classes.length, classTypes: types };
-          })
-        );
-        setTrainers(enriched);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchTrainers();
-  }, []);
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <CircularProgress color="secondary" />
-      </Box>
-    );
-  }
+export default function TrainersPage({ trainers, error }) {
   if (error) {
     return <Alert severity="error">Error: {error}</Alert>;
   }
@@ -131,4 +92,36 @@ export default function TrainersPage() {
       <Footer />
     </>
   );
+}
+
+export async function getServerSideProps() {
+  try {
+    // Fetch all trainers
+    const trainersRes = await fetch(`http://localhost:3000/api/trainers`);
+    if (!trainersRes.ok) throw new Error('Failed to fetch trainers');
+    const { trainers: rawTrainers } = await trainersRes.json();
+
+    // For each trainer, fetch class data
+    const trainers = await Promise.all(
+      rawTrainers.map(async (t) => {
+        const cRes = await fetch(
+          `http://localhost:3000/api/classes?trainerId=${t._id}`
+        );
+        const { classes = [] } = cRes.ok ? await cRes.json() : { classes: [] };
+        const types = Array.from(new Set(classes.map((c) => c.classType)))
+          .map((type) => type.charAt(0).toUpperCase() + type.slice(1));
+
+        return {
+          _id: t._id,
+          trainerName: t.trainerName,
+          classCount: classes.length,
+          classTypes: types,
+        };
+      })
+    );
+
+    return { props: { trainers } };
+  } catch (err) {
+    return { props: { trainers: [], error: err.message } };
+  }
 }

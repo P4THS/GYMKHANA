@@ -2,11 +2,11 @@ import React, { useState } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { Box, Container } from "@mui/material";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import RegisterCard from "@/components/RegisterCard";
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
+import RegisterCard from '@/components/RegisterCard';
 
-export default function JoinTrainer() {
+export default function JoinTrainer({}) {
   const router = useRouter();
   const [values, setValues] = useState({
     username: "",
@@ -96,4 +96,11 @@ export default function JoinTrainer() {
       <Footer />
     </>
   );
+}
+
+// Because this page has no runtime data dependencies, we can pre-render it at build time
+export async function getStaticProps() {
+  return {
+    props: {},
+  };
 }
